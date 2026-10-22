@@ -8,7 +8,6 @@ class Vehicle:
     def __init__(self, world): # constructor
         self.world = world
         self.actor = None
-        self.spawned = False
 
     def spawn(self, id):
        
@@ -31,11 +30,9 @@ class Vehicle:
         # spawn the ego vehicle & store actor reference
         try:
             self.actor = self.world.spawn_actor(blueprint, transform) # implement error handing
-            self.spawned = True
 
         except RuntimeError as e:
             print(f"Failed to spawn vechile: {e}")
-            self.spawned = False
             self.actor = None
 
     # control the vehicle
