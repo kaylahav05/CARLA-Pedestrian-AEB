@@ -4,6 +4,7 @@ import time
 
 from simulation.scenario import Scenario
 from tests.scenarioconfig import SCENARIOS
+from perception.camera import Camera
 
 
 def main():
@@ -14,6 +15,10 @@ def main():
 
     original_settings = world.get_settings()
     scenario = None
+    camera = None
+
+
+    print("RGB camera attached successfully")
 
     try:
         # Configure synchronous simulation
@@ -29,6 +34,10 @@ def main():
         if not scenario.setup():
             print("Scenario setup failed")
             return
+
+        camera = Camera(world, scenario.vehicle.actor)
+        camera.attach_camera()
+        print("RGB camera attached successfully")
 
         # Update actor positions after spawning
         world.tick()
@@ -69,6 +78,9 @@ def main():
             scenario.update()
             world.tick()
 
+            # Display RGB camera feed
+            camera.display()
+
             # Follow vehicle with spectator camera
             vehicle_transform = scenario.vehicle.actor.get_transform()
 
@@ -90,6 +102,9 @@ def main():
         print("Scenario completed")
 
     finally:
+        if camera is not None:
+            camera.destroy()
+
         if scenario is not None:
             scenario.cleanup()
 

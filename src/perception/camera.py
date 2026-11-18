@@ -40,12 +40,10 @@ class Camera:
             cv2.waitKey(1)
 
     def destroy(self):
-    # check the camera exists
-            if self.camera is None:
-                    print("The camera object does not exist")
-                    return
-    
-            # destroy and clear
-            
+        if self.camera is not None:
+            self.camera.stop()
+            self.camera.destroy()
             self.camera = None
+
+        cv2.destroyAllWindows()
          
