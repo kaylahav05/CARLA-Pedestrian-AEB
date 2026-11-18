@@ -1,0 +1,6 @@
+{
+    "python.analysis.extraPaths": [
+        "./src",
+        "C:/Users/kayla/OneDrive/Documents/PythonAPI/carla"
+    ]
+}

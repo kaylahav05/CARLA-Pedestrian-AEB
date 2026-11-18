@@ -107,7 +107,6 @@ class Pedestrian:
 
         return True
 
-
     def get_location(self):
         if self.actor is None:
                 print("Cannot get location: pedestrian does not exist")
@@ -115,7 +114,6 @@ class Pedestrian:
         
         location = self.actor.get_location()
         return location
-
 
     def destroy(self):
         # check the actor exists
