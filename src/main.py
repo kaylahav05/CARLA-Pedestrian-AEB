@@ -64,7 +64,7 @@ def main():
             world,
             scenario.vehicle.actor,
             scenario.pedestrian.actor
-)
+        )
 
 
         # Start scenario
@@ -89,11 +89,6 @@ def main():
             # Display camera feed
             camera.display()
 
-            # Run YOLO pedestrian detection
-            if camera.frame is not None:
-                detections = detector.detect_pedestrians(camera.frame)
-                print("Pedestrians detected:", detections)
-
             # Follow vehicle with spectator camera
             vehicle_transform = scenario.vehicle.actor.get_transform()
 
@@ -108,6 +103,16 @@ def main():
                     )
                 )
             )
+
+            # Run YOLO pedestrian detection
+            if camera.frame is not None:
+                detections = detector.detect_pedestrians(camera.frame)
+                print("Pedestrians detected:", detections)
+
+                if detections:
+                    distance = detector.get_pedestrian_distance()
+                    print("distance = ", distance)
+
 
             # Slow simulation for visual testing
             time.sleep(0.05)

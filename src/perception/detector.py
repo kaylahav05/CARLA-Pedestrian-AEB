@@ -1,6 +1,8 @@
 
 import carla
+import math
 from ultralytics import YOLO
+
 
 class Detector:
     def __init__(self, world, pedestrian, vehicle):
@@ -35,3 +37,12 @@ class Detector:
                     "bounding_box": [x1, y1, x2, y2]
                 })
             return detections
+
+
+    def get_pedestrian_distance(self):
+        vehicle_location = self.vehicle.get_location()
+        pedestrian_location = self.pedestrian.get_location()
+
+        distance = vehicle_location.distance(pedestrian_location)
+
+        return distance
