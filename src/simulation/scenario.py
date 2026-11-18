@@ -30,10 +30,6 @@ class Scenario:
         self.vehicle.set_destination(self.config["vehicle_destination"])
         self.vehicle.set_target_speed(self.config["vehicle_target_speed"])
 
-        if not self.vehicle.setup_agent():
-            print("Scenario setup failed: cant setup agent")
-            self.cleanup()               
-            return False 
 
 
         # pedestrian set up

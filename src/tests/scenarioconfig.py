@@ -13,7 +13,7 @@ SCENARIOS = {
             carla.Rotation(yaw=0.35)
             ),
         "vehicle_destination": carla.Location(
-            x=35.0, y=140.54, z=0.60
+            x=31.0, y=141, z=0
         ),
         "vehicle_target_speed": 30.0,
 

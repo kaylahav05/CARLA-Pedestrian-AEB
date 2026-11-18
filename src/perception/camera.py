@@ -32,7 +32,6 @@ class Camera:
         array = array.reshape((image.height, image.width, 4))
         self.frame = array[:, :, :3].copy()
 
-
     def display(self):
         # show the images in the window
         if self.frame is not None:

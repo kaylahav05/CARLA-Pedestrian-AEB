@@ -2,3 +2,4 @@
 carla===0.9.16
 shapely
 networkx
+ultralytics
