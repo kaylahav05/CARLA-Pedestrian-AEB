@@ -1,12 +1,16 @@
 # this file to generate vehicle and pedestrian scenarios
 from simulation.pedestrian import Pedestrian
 from simulation.vehicle import Vehicle
+from control.aeb_system import AEB
+from control.risk_assessment import RiskAssessment
+from perception.detector import Detector
 import carla
 
 class Scenario:
     def __init__(self, world, config):
         self.world = world
         self.config = config
+
         self.vehicle = None
         self.pedestrian = None
         self.is_running = False
@@ -14,6 +18,9 @@ class Scenario:
         self.crossing_finished = False
         self.start_time = None
         self.end_time = None
+
+        self.risk = None
+        self.aeb = None
 
     # initialize actors and spawn them config initial spawns
     def setup(self):
@@ -43,8 +50,12 @@ class Scenario:
 
         self.pedestrian.set_destination(self.config["pedestrian_destination"])
         self.pedestrian.set_speed(self.config["pedestrian_speed"])
-        return True
 
+        # AEB and risk set up
+        self.risk = RiskAssessment()
+        self.aeb = AEB(self.vehicle)
+        return True
+        
     # begin vehicle and pedestrian movement
     def start(self):
         #check that actors exist
@@ -86,17 +97,41 @@ class Scenario:
         return distance <= trigger_distance
 
     # update behavior with simulation ticks
-    def update(self):
+    def update(self, detections, pedestrian_distance, ped_in_path, aeb_enabled):
         if not self.is_running:
             print("Cant update scenario, it isnt running")
             return
 
+
+
         # get controls from basic agent & apply them
         control = self.vehicle.get_agent_control()
 
-        # once AEB is set up, set control to aeb control if necessary
+        # get info for risk assessment
+        speed = self.vehicle.get_speed()
+        if detections:
+            confidence = detections[0]["confidence"]
+        else:
+            confidence = 0.0
 
-        self.vehicle.apply_control(control)
+        # Assess risk
+        if pedestrian_distance is not None:
+            risk_state = self.risk.assess_risk(
+                speed,
+                pedestrian_distance,
+                confidence
+            )
+        else:
+            risk_state = "NONE"
+
+        print(risk_state)
+
+        # once AEB is set up, set control to aeb control if necessary
+        if aeb_enabled:
+            self.aeb.update(risk_state, ped_in_path)
+
+        if (self.aeb.state == "NORMAL"):
+            self.vehicle.apply_control(control)
 
         # check if ped should start crossing & move pedestrian
         if not self.crossing_started:
