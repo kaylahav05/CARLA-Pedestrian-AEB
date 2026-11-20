@@ -52,7 +52,6 @@ class Vehicle:
             self.actor = None
             return False
 
-    
     def set_destination(self, destination):
         self.destination = destination
         if self.agent is not None:
@@ -89,7 +88,7 @@ class Vehicle:
         location = self.actor.get_location()
         return location
     
-    # returns the current speed of the vehicle in km/hr
+    # returns the current speed of the vehicle
     def get_speed(self):
 
         if self.actor is None:
@@ -98,10 +97,10 @@ class Vehicle:
 
         velocity = self.actor.get_velocity()
 
-        speed_ms = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
-        speed_kmh = speed_ms * 3.6
+        speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+        print(f"Vehicle speed: {speed:.2f} m/s")
 
-        return speed_kmh
+        return speed
 
     # gets basic agents reccommended driving command
     def get_agent_control(self):
@@ -110,7 +109,6 @@ class Vehicle:
             return None
 
         return self.agent.run_step()
-
 
     # applies the controls to the vehicle -> throttle steer & brake
     def apply_control(self, control):
@@ -125,8 +123,6 @@ class Vehicle:
         # apply the control
         self.actor.apply_control(control)
         return True
-
-
 
     # checks if the vehicle has reached its destination
     def reached_destination(self):

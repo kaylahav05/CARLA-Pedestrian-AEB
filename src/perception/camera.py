@@ -32,11 +32,32 @@ class Camera:
         array = array.reshape((image.height, image.width, 4))
         self.frame = array[:, :, :3].copy()
 
-    def display(self):
+    def display(self, path_polygon=None):
+        """
         # show the images in the window
         if self.frame is not None:
             cv2.imshow("CARLA RGB Camera", self.frame)
             cv2.waitKey(1)
+
+        """
+        if self.frame is None:
+            return
+
+        # Copy the image so we don't modify the original frame
+        display_frame = self.frame.copy()
+
+        # Draw driving path
+        if path_polygon is not None:
+            cv2.polylines(
+                display_frame,
+                [path_polygon],
+                isClosed=True,
+                color=(0, 255, 0),
+                thickness=2
+            )
+
+        cv2.imshow("CARLA RGB Camera", display_frame)
+        cv2.waitKey(1)
 
     def destroy(self):
         if self.camera is not None:
