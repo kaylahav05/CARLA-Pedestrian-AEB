@@ -2,34 +2,36 @@ import carla
 
 class RiskAssessment():
     def __init__(self, reaction_time=0.2, safety_margin = 3):
-        self.MAX_DECELERATION = 7
-        self.REACTION_TIME = 0.2
-        self.TTC_WARNING = 3.0
-        self.TTC_CRITICAL = 1.5
-        self.CONFIRM_FRAMES = 3
-        self.DECEL_WARNING = 3.0
+        self.TTC_BRAKE = 1.5 # seconds left for the AEB to emergency brake
+        self.last_ttc = None
+        self.last_risk_state = None
 
-    def assess_risk(self, speed, ped_distance, confidence, ped_speed=0):
+
+    def assess_risk(self, confidence, vehicle_speed, pedestrian_speed, distance_between):
 
         # is yolo confident enough
         if confidence < .50:
             return "NONE"
+       
 
-        closing_speed = speed - ped_speed
+        # estimate ttc, TTC = distance between ped & car / speed - closing speed
 
-        if ped_distance <= 0 or closing_speed <= 0.5:
-            return "NONE"
+        closing_speed = vehicle_speed - pedestrian_speed
+        if closing_speed <= 0.001:
+            ttc = float("inf")
+        else:
+            ttc = distance_between / closing_speed
 
-        ttc = ped_distance / closing_speed
-        effective_distance = ped_distance - closing_speed * self.REACTION_TIME
-        if effective_distance <= 0:
-            return "CRITICAL"
-        
-        req_deceleration = closing_speed ** 2 / (2 *effective_distance)
+        # critical risk
+        if ttc <= self.TTC_BRAKE:
+            self.last_risk_state
+            self.last_risk_state =  "CRITICAL"
 
-        if ttc < self.TTC_CRITICAL or req_deceleration > 0.7 * self.MAX_DECELERATION:
-            print (f"TTC: {ttc}")
-            return "CRITICAL"
-        if ttc < self.TTC_WARNING or req_deceleration > self.DECEL_WARNING:
-            return "WARNING"
-        return "NONE"
+        elif ttc > self.TTC_BRAKE and ttc <= self.TTC_BRAKE + 1.5:
+            self.last_risk_state = "WARNING"
+
+        elif ttc > self.TTC_BRAKE + 1.5:
+            self.last_risk_state = "SAFE"
+
+        return self.last_risk_state
+
