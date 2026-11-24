@@ -3,6 +3,7 @@
 
 import carla
 import random
+import math
 
 class Pedestrian:
 
@@ -75,7 +76,7 @@ class Pedestrian:
             return False
 
         # check that destination and speed are set
-        if self.destination is None or self.speed is None:
+        if self.speed is None:
             return False
 
         if self.speed <= 0:
@@ -84,28 +85,37 @@ class Pedestrian:
         # get current pedestrian position
         current = self.actor.get_location()
 
-        # calculate direction toward destination
-        direction = self.destination - current
-        direction.z = 0.0
+        yaw = math.radians(
+            self.actor.get_transform().rotation.yaw
+        )
 
-        # check if destination reached
-        if direction.length() <= 0.5:
-            self.actor.apply_control(carla.WalkerControl(speed=0.0))
-            return False
+        direction = carla.Vector3D(
+            x=math.cos(yaw),
+            y=math.sin(yaw),
+            z=0.0
+        )
 
-        # normalize direction
-        direction = direction.make_unit_vector()
 
         # move pedestrian
         control = carla.WalkerControl(
             direction=direction,
-            speed=self.speed,
+            speed=self.speed / 3.6,
             jump=False
         )
 
         self.actor.apply_control(control)
-
         return True
+
+    def get_speed_ms(self):
+        velocity = self.actor.get_velocity()
+
+        speed_ms = math.sqrt(
+            velocity.x**2 +
+            velocity.y**2 +
+            velocity.z**2
+        )
+
+        return speed_ms
 
     def get_location(self):
         if self.actor is None:
