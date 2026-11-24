@@ -14,7 +14,7 @@ class Detector:
         self.vehicle = vehicle
         
         self.model = YOLO("yolo11n.pt")
-        self.confidence_threshold = .5 # temp min condidence
+        self.confidence_threshold = .25
 
         self.path_polygon = np.array([
             [375, 300],  # Top left
@@ -28,7 +28,7 @@ class Detector:
             return []
 
         # run yolo on the frame to get detected objs
-        results = self.model(frame, verbose=False)
+        results = self.model(frame, conf=0.25, verbose=False)
         detections = []
 
         # process each object yolo detects in frame

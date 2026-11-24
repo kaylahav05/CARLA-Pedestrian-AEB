@@ -19,7 +19,7 @@ class Camera:
 
         camera_blueprint.set_attribute("image_size_x", "800")
         camera_blueprint.set_attribute("image_size_y", "600")
-        camera_blueprint.set_attribute("fov", "90")
+        camera_blueprint.set_attribute("fov", "60")
 
         camera_transform = carla.Transform(carla.Location(x=0.8, z=1.7))
 

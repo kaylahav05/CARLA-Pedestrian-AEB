@@ -9,6 +9,7 @@ class AEB:
         self.kp = 0.1
         self.clear_frames = 0
         self.required_clear_frames = 10
+        self.a_max = 8
         self.max_deceleration = 8
         self.brake = 0
         self.last_required_deceleration = 0
@@ -68,22 +69,13 @@ class AEB:
             return min(required_deceleration, self.max_deceleration)
     
     def emergency_brake(self, required_deceleration):
+        # can't stop in time (required was capped) -> full brake
+        if required_deceleration >= self.max_deceleration - 1e-6:
+            self.brake = 1.0
+        else:
+            # feed-forward: brake proportional to the decel we need
+            self.brake = required_deceleration / self.a_max
 
-        # get current longitudinal acceleration
-        acceleration = self.vehicle.actor.get_acceleration()
-
-        forward = self.vehicle.actor.get_transform().get_forward_vector()
-
-        longitudinal_acceleration = (
-            acceleration.x * forward.x +
-            acceleration.y * forward.y +
-            acceleration.z * forward.z
-        )
-
-        actual_deceleration = -longitudinal_acceleration
-        error = required_deceleration - actual_deceleration
-
-        self.brake = self.kp * error
         self.brake = max(0.0, min(self.brake, 1.0))
 
         control = carla.VehicleControl(

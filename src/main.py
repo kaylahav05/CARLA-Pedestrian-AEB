@@ -19,7 +19,23 @@ REPEATS = 1
 MAX_TESTS = 75
 VISUAL_DELAY_SECONDS = 0.05
 
+def print_avoidance_rate(summary):
+    valid = [r for _, _, r in summary if not r["error"]]
+    skipped = len(summary) - len(valid)
+    if not valid:
+        print("No completed runs, no avoidance rate.")
+        return
 
+    avoided = sum(1 for r in valid if not r["collided"])
+    print(f"\nCollision avoidance rate: {avoided}/{len(valid)} "
+          f"= {100 * avoided / len(valid):.1f}%")
+
+    speeds = [r["impact_speed"] for r in valid
+              if r["collided"] and r["impact_speed"] is not None]
+    if speeds:
+        print(f"Mean impact speed (collisions only): {sum(speeds)/len(speeds):.2f} m/s")
+    if skipped:
+        print(f"({skipped} run(s) excluded because they errored)")
 def get_speed(actor):
     velocity = actor.get_velocity()
 
@@ -28,7 +44,6 @@ def get_speed(actor):
         velocity.y**2 +
         velocity.z**2
     )
-
 
 def get_crossing_distances(config, vehicle, pedestrian):
     crossing = config["crossing_point"]
@@ -63,7 +78,6 @@ def get_crossing_distances(config, vehicle, pedestrian):
     )
 
     return front_distance, pedestrian_crossing_distance
-
 
 def run_scenario(world, config, run_number, csv_logger, aeb_enabled=True):
 
@@ -165,7 +179,7 @@ def run_scenario(world, config, run_number, csv_logger, aeb_enabled=True):
         # Main simulation loop
         while (
             not scenario.is_complete()
-            and (elapsed_ticks < max_ticks or scenario.collision_detected)
+            and (elapsed_ticks < max_ticks or scenario.has_collision())
         ):
 
 
@@ -198,8 +212,10 @@ def run_scenario(world, config, run_number, csv_logger, aeb_enabled=True):
                             threat_detections.append(detection)
 
                     ped_in_path = bool(path_detections)
+                    
 
             # Risk assessment, AEB, pedestrian movement
+            
             scenario.update(
                 threat_detections,
                 pedestrian_distance,
@@ -293,7 +309,15 @@ def run_scenario(world, config, run_number, csv_logger, aeb_enabled=True):
                 aeb_activation_time = simulation_time
 
             # Read collision status from Scenario for logging only.
-            result["collided"] = scenario.collision_detected
+            result["collided"] = scenario.has_collision()
+            if result["collided"]:
+                frame = scenario.collision.frame
+                result["collision_frame"] = frame
+                result["impact_speed"] = pre_tick_speeds.get(frame, scenario.collision.speed)
+                # Align validation records with the reported collision frame.
+                for tick in result["ticks"]:
+                    if tick["frame"] >= frame:
+                        tick["collision"] = True
 
             # Access current controller objects
             aeb = getattr(scenario, "aeb", None)
@@ -377,7 +401,7 @@ def run_scenario(world, config, run_number, csv_logger, aeb_enabled=True):
                 "ped_y": pedestrian_location.y,
                 "ped_speed": pedestrian_speed,                        # m/s
                 "fcw_active": getattr(aeb, "state", None) in FCW_STATES,
-                "collision": result["collided"],
+                "collision": scenario.has_collision(),
                 "frame": frame_id,
             })
 
@@ -387,15 +411,6 @@ def run_scenario(world, config, run_number, csv_logger, aeb_enabled=True):
             if VISUAL_DELAY_SECONDS:
                 time.sleep(VISUAL_DELAY_SECONDS)
 
-        # Read the final outcome from Scenario.
-        result["collided"] = scenario.collision_detected
-        result["collision_frame"] = scenario.collision_frame
-        if result["collided"]:
-            result["impact_speed"] = pre_tick_speeds.get(scenario.collision_frame)
-            # Align validation records with the reported collision frame.
-            for tick in result["ticks"]:
-                if tick["frame"] >= scenario.collision_frame:
-                    tick["collision"] = True
 
         last = result["ticks"][-1] if result["ticks"] else None
         if result["collided"]:
@@ -416,7 +431,7 @@ def run_scenario(world, config, run_number, csv_logger, aeb_enabled=True):
         traceback.print_exc()
 
     finally:
-
+        
 
         if camera is not None:
             camera.destroy()
@@ -622,8 +637,7 @@ def main():
 
     crossing_cases = [
         config for config in all_cases
-        if config["scenario"] == "along-path"
-
+        if config["scenario"] == "stationary"
 
     
     
@@ -685,6 +699,7 @@ def main():
                     csv_logger,
                     AEB_ENABLED
                 )
+                summary.append((test_id, run_number, result))
                 csv_logger.end_run()
 
     finally:
@@ -725,6 +740,7 @@ def main():
                     f"{impact:<12} {min_dist}"
                 )
 
+        print_avoidance_rate(summary)
         print("Simulation cleaned up")
 
 
