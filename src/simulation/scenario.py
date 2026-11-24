@@ -4,9 +4,10 @@ from simulation.vehicle import Vehicle
 from control.aeb_system import AEB
 from control.risk_assessment import RiskAssessment
 from perception.detector import Detector
+from perception.collision_detector import CollisionDetector
 import carla
 import math
-import numpy as np
+import time
 
 class Scenario:
     def __init__(self, world, config):
@@ -20,19 +21,14 @@ class Scenario:
         self.crossing_finished = False
         self.start_time = None
         self.end_time = None
-        self.pedestrian_was_ahead = False
         self.obstructions = []
 
         self.risk = None
         self.aeb = None
+        self.collision = None
+        self.pedestrian_was_ahead = False
+        
 
-        self.collision_sensor = None
-        self.collision_detected = False
-        self.collision_time = None
-        self.collision_frame = None
-        self.post_collision_duration = 3.0
-        self.pedestrian_collision_sensor = None     
-        self.geometric_collision_detected = False
 
     def calculate_initial_headway(self):
         ttc0 = self.config["initial_ttc"]
@@ -310,28 +306,11 @@ class Scenario:
         self.risk = RiskAssessment()
         self.aeb = AEB(self.vehicle)
 
-        blueprint = self.world.get_blueprint_library().find(
-        "sensor.other.collision"
-         )
-        
-        # set up collision sensor
-        self.collision_sensor = self.world.spawn_actor(
-            blueprint,
-            carla.Transform(),
-            attach_to=self.vehicle.actor
+        self.collision = CollisionDetector(
+            self.world, self.vehicle.actor, self.pedestrian.actor
         )
+        self.collision.attach()
 
-        self.collision_sensor.listen(self.detect_collision)
-
-        self.pedestrian_collision_sensor = self.world.spawn_actor(
-            blueprint,
-            carla.Transform(),
-            attach_to=self.pedestrian.actor
-        )
-
-        self.pedestrian_collision_sensor.listen(
-            self.detect_pedestrian_collision
-        )
         return True
         
     # begin vehicle and pedestrian movement
@@ -395,15 +374,6 @@ class Scenario:
 
         return trigger_distance
     
-    def get_bounding_box_corners(self, actor):
-
-        bounding_box = actor.bounding_box
-
-        vertices = bounding_box.get_world_vertices(
-            actor.get_transform()
-        )
-
-        points = [(vertex.x, vertex.y) for vertex in vertices]
 
         return points
     # check if the pedestrian should start crossing the road yet
@@ -430,134 +400,15 @@ class Scenario:
 
         return front_distance <= trigger_distance    
     
-    def detect_collision(self, event):
-
-        print("\n========== RAW COLLISION EVENT ==========")
-        print("Frame:", event.frame)
-        print("Timestamp:", event.timestamp)
-        print("Sensor parent ID:", event.actor.id)
-        print("Other actor ID:", event.other_actor.id)
-        print("Other actor type:", event.other_actor.type_id)
-        print("Expected pedestrian ID:", self.pedestrian.actor.id)
-        print("Normal impulse:", event.normal_impulse)
-
-        if event.other_actor.id != self.pedestrian.actor.id:
-            print("REJECTED: Actor is not the test pedestrian")
-            return
-
-        if self.collision_detected:
-            print("REJECTED: Collision already recorded")
-            return
-
-        self.collision_time = event.timestamp
-        self.collision_frame = event.frame
-        self.collision_detected = True
-
-        print("ACCEPTED: PEDESTRIAN COLLISION DETECTED")
-        print("=========================================\n")
-
-    def detect_pedestrian_collision(self, event):
-
-
-        print("\n===== PEDESTRIAN SENSOR EVENT =====")
-        print("Frame:", event.frame)
-        print("Timestamp:", event.timestamp)
-        print("Other actor ID:", event.other_actor.id)
-        print("Other actor type:", event.other_actor.type_id)
-        print("Expected vehicle ID:", self.vehicle.actor.id)
-        print("Normal impulse:", event.normal_impulse)
-
-        if event.other_actor.id == self.vehicle.actor.id:
-            print("PEDESTRIAN SENSOR DETECTED EGO VEHICLE")
-
-        print("===================================\n")
-
-    def check_geometric_collision(self):
-
-        vehicle = self.vehicle.actor
-        pedestrian = self.pedestrian.actor
-
-        vehicle_points = np.array(
-            self.get_bounding_box_corners(vehicle)
-        )
-
-        pedestrian_points = np.array(
-            self.get_bounding_box_corners(pedestrian)
-        )
-
-        axes = []
-
-        for actor in [vehicle, pedestrian]:
-
-            transform = actor.get_transform()
-
-            yaw = math.radians(
-                transform.rotation.yaw
-                + actor.bounding_box.rotation.yaw
-            )
-
-            axes.append(
-                np.array([math.cos(yaw), math.sin(yaw)])
-            )
-
-            axes.append(
-                np.array([-math.sin(yaw), math.cos(yaw)])
-            )
-
-        for axis in axes:
-
-            vehicle_projection = vehicle_points @ axis
-            pedestrian_projection = pedestrian_points @ axis
-
-            if (
-                vehicle_projection.max() < pedestrian_projection.min()
-                or
-                pedestrian_projection.max() < vehicle_projection.min()
-            ):
-                return False
-
-        return True
-
-    def detect_geometric_collision(self):
-
-        if self.geometric_collision_detected:
-            return
-
-        if self.check_geometric_collision():
-
-            snapshot = self.world.get_snapshot()
-
-            self.geometric_collision_detected = True
-            self.geometric_collision_frame = snapshot.frame
-            self.geometric_collision_time = (
-                snapshot.timestamp.elapsed_seconds
-            )
-
-            print("\nGEOMETRIC COLLISION DETECTED")
-            print("Frame:", self.geometric_collision_frame)
-            print("Time:", self.geometric_collision_time)
-
-    def post_collision_complete(self):
-
-        current_time = (
-            self.world.get_snapshot().timestamp.elapsed_seconds
-        )
-
-        elapsed_time = current_time - self.collision_time
-
-        return elapsed_time >= self.post_collision_duration
-
     def has_collision(self):
-        return (
-            self.collision_detected
-            or self.geometric_collision_detected
-        )
+        return self.collision is not None and self.collision.detected
     # update behavior with simulation ticks
     def update(self, detections, distance_between, ped_in_path, aeb_enabled):
         if not self.is_running:
             print("Cant update scenario, it isnt running")
             return
-        self.detect_geometric_collision()
+        self.collision.update()
+
         # get info for risk assessment
         vehicle_speed = self.vehicle.get_speed()
         pedestrian_speed = self.pedestrian.get_speed_ms()
@@ -657,7 +508,9 @@ class Scenario:
         
         # if a collision occurs return true
         if self.has_collision():
-            return self.post_collision_complete()
+            print("ended bc collison detected")
+            time.sleep(2)
+            return self.has_collision()
 
         if self.config["scenario"] == "stationary" or self.config["scenario"] == "along-path":
             if self.aeb.state == "STOPPED":
@@ -681,16 +534,9 @@ class Scenario:
         return False
 
     def cleanup(self):
-        if self.pedestrian_collision_sensor is not None:
-            self.pedestrian_collision_sensor.stop()
-            self.pedestrian_collision_sensor.destroy()
-            self.pedestrian_collision_sensor = None
 
-        if self.collision_sensor is not None:
-        
-            self.collision_sensor.stop()
-            self.collision_sensor.destroy()
-            self.collision_sensor = None
+        if self.collision is not None:
+            self.collision.destroy()
 
         # Stop scenario
         self.is_running = False
