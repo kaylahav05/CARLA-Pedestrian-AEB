@@ -246,5 +246,5 @@ Thumbs.db
 # Simulation output files
 *.log
 
-# CARLA third-party agents
-src/agents/
+*.csv
+test_validator.py
